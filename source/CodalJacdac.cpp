@@ -64,7 +64,7 @@ jd_frame_t* CodalJacdac::nextSendFrame()
     return ret;
 }
 
-void CodalJacdac::executeAfterMicro(int us, cb_t cb)
+void CodalJacdac::executeAfterMicros(int us, cb_t cb)
 {
     for (unsigned i = 0; i < JD_EVENT_LIST_SIZE; ++i) {
         if (eventList[i] == NULL) {
@@ -75,6 +75,28 @@ void CodalJacdac::executeAfterMicro(int us, cb_t cb)
     }
 }
 
+int CodalJacdac::sendData(const void* data, uint32_t numbytes)
+{
+    instance->sendingState();
+    return instance->serial->send((uint8_t*)data, numbytes);
+}
+
+int CodalJacdac::receiveData(void* data, uint32_t maxbytes)
+{
+    instance->receivingState();
+    return instance->serial->receive((uint8_t*)data, maxbytes);
+}
+
+void CodalJacdac::disableSerial()
+{
+    instance->idleState();
+}
+
+bool CodalJacdac::isPinHigh()
+{
+    return instance->serial->p.getDigitalValue() == 1;
+}
+
 int CodalJacdac::init()
 {
     // Nothing to do
@@ -83,7 +105,17 @@ int CodalJacdac::init()
 
 void CodalJacdac::periodicCallback()
 {
-    // Check if RX contain something
+    uint64_t now_long = tim_get_micros();
+    now               = (uint32_t)now_long;
+
+    jd_frame_t* fr = jd_rx_get_frame();
+    if (fr) jd_services_process_frame(fr);
+
+    jd_services_tick();
+
+#if JD_CONFIG_APP_PROCESS_HOOK == 1
+    app_process();
+#endif
 }
 
 void CodalJacdac::idleCallback() {}
@@ -91,11 +123,15 @@ void CodalJacdac::idleCallback() {}
 CodalJacdac::CodalJacdac(SingleWireSerial* serial, uint16_t id)
     : CodalComponent(id, 0), serial(serial), state(JacdacState::IDLE)
 {
+    tim_init();
+    uart_init();
+    jd_init();
+
     serial->setMode(SingleWireMode::SingleWireDisconnected);
     serial->setBaud(1000000);
 
     serial->p.setIRQ(pinIRQHandler);
-    serial->p.eventOn(DEVICE_PIN_EVENT_ON_EDGE);
+    idleState();
 
     for (unsigned i = 0; i < JD_EVENT_LIST_SIZE; ++i) {
         eventList[i] = NULL;
@@ -112,6 +148,7 @@ void CodalJacdac::idleState()
 {
     instance->serial->setMode(SingleWireMode::SingleWireDisconnected);
     instance->serial->p.eventOn(DEVICE_PIN_EVENT_ON_EDGE);
+    instance->serial->setIRQ(NULL);
     instance->state = JacdacState::IDLE;
 }
 
@@ -119,6 +156,7 @@ void CodalJacdac::receivingState()
 {
     instance->serial->setMode(SingleWireMode::SingleWireRx);
     instance->serial->p.eventOn(DEVICE_PIN_EVENT_NONE);
+    instance->serial->setIRQ(serialIRQHandler);
     instance->state = JacdacState::RECEIVING;
 }
 
@@ -126,6 +164,7 @@ void CodalJacdac::sendingState()
 {
     instance->serial->setMode(SingleWireMode::SingleWireTx);
     instance->serial->p.eventOn(DEVICE_PIN_EVENT_NONE);
+    instance->serial->setIRQ(serialIRQHandler);
     instance->state = JacdacState::SENDING;
 }
 
@@ -156,7 +195,7 @@ void CodalJacdac::pinIRQHandler(int event)
     }
 }
 
-void CodalJacdac::serialIRQHandler(int errCode)
+void CodalJacdac::serialIRQHandler(uint16_t errCode)
 {
     if (instance == nullptr) return;
 

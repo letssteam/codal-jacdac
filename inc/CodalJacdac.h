@@ -77,7 +77,38 @@ class CodalJacdac : public CodalComponent {
      * @param us The time to wait (in µs) before executing the calback
      * @param cb The callback to execute (should be greter than 0)
      */
-    void executeAfterMicro(int us, cb_t cb);
+    void executeAfterMicros(int us, cb_t cb);
+
+    /**
+     * @brief Send data over the Serial
+     *
+     * @param data data to send
+     * @param numbytes number of bytes to send
+     * @return int 0 if success, -1 otherwise
+     */
+    int sendData(const void* data, uint32_t numbytes);
+
+    /**
+     * @brief Receive data over the Serial
+     *
+     * @param data pointer to store data
+     * @param maxbytes maximum amount of bytes to receive
+     * @return int
+     */
+    int receiveData(void* data, uint32_t maxbytes);
+
+    /**
+     * @brief Disable the serail, and go back to IDLE
+     *
+     */
+    void disableSerial();
+
+    /**
+     * @brief Retrieve if the pin digitalValue is HIGH
+     *
+     * @return true if the digitalValue is HIGH, false otherwise
+     */
+    bool isPinHigh();
 
     /**
      * Implement this function to receive a function call after the devices'
@@ -116,7 +147,7 @@ class CodalJacdac : public CodalComponent {
     void onTimeoutEvent(Event evt);
 
     static void pinIRQHandler(int event);
-    static void serialIRQHandler(int errCode);
+    static void serialIRQHandler(uint16_t errCode);
 };
 
 }  // namespace codal
