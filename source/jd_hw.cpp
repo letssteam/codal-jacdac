@@ -1,5 +1,23 @@
 #include "CodalJacdac.h"
 
+void hw_panic(){
+#warning TOTDO
+}
+
+uint64_t hw_device_id(void)
+{
+#warning TOTDO
+    return 0xffffffffffffffff;
+}
+
+void tim_init(void) {}
+
+uint64_t tim_get_micros(void)
+{
+#warning TODO;
+    return 0;
+}
+
 void tim_set_timer(int delta, cb_t cb)
 {
     if (codal::CodalJacdac::getInstance() == nullptr) {
